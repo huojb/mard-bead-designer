@@ -1,0 +1,49 @@
+{
+  "name": "mard-bead-designer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MARD 221色 52x52 拼豆图纸设计软件",
+  "main": "dist-electron/main.js",
+  "author": "huojianbin",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && tsc -p electron/tsconfig.json",
+    "preview": "vite preview",
+    "start": "npm run build && node_modules/.bin/electron .",
+    "electron:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && tsc -p electron/tsconfig.json && VITE_DEV=1 electron .\"",
+    "dist": "npm run build && electron-builder --mac"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^9.0.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.huojianbin.mardbead",
+    "productName": "MARD拼豆设计",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.graphics-design",
+      "icon": "build/icon.png"
+    }
+  }
+}
