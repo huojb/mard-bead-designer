@@ -97,6 +97,7 @@ const App: React.FC = () => {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* 左侧：画布 */}
         <div
+          data-scroll
           style={{
             flex: 1,
             display: 'flex',

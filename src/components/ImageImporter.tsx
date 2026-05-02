@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useEditorStore, GRID_SIZE } from '../store/editor';
 import { resampleToGrid, fitScaleToGrid } from '../core/resample';
-import { quantizeRGBA } from '../core/quantize';
+import { quantizeRGBA, posterizeRGBA } from '../core/quantize';
 import { detectSolidBackground, removeSolidBackground } from '../core/solidBgRemove';
 import { MARD221 } from '../data/mard221';
 
@@ -13,6 +13,7 @@ const ImageImporter: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [removeBg, setRemoveBg] = useState(true);
+  const [colorCount, setColorCount] = useState(0); // 0 = 不简化
   const [previewGrid, setPreviewGrid] = useState<Uint8Array | null>(null);
 
   const importImage = useEditorStore((s) => s.importImage);
@@ -41,6 +42,11 @@ const ImageImporter: React.FC = () => {
       if (bg) {
         data = removeSolidBackground(data, GRID_SIZE, GRID_SIZE, bg);
       }
+    }
+
+    // 色彩简化（k-means）
+    if (colorCount > 0) {
+      data = posterizeRGBA(data, colorCount);
     }
 
     const grid = quantizeRGBA(data);
@@ -90,7 +96,7 @@ const ImageImporter: React.FC = () => {
     }
 
     // 边界遮罩（表示超出52x52区域的部分，这里因为是精确52x52所以没有超出）
-  }, [importImage, importScale, importOffsetX, importOffsetY, removeBg]);
+  }, [importImage, importScale, importOffsetX, importOffsetY, removeBg, colorCount]);
 
   useEffect(() => {
     updatePreview();
@@ -174,6 +180,23 @@ const ImageImporter: React.FC = () => {
           <input type="checkbox" checked={removeBg} onChange={(e) => setRemoveBg(e.target.checked)} />
           去除纯色背景
         </label>
+      </div>
+
+      {/* 色彩简化 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555' }}>
+        <span style={{ whiteSpace: 'nowrap' }}>色彩简化</span>
+        <input
+          type="range"
+          min={0}
+          max={16}
+          step={1}
+          value={colorCount}
+          onChange={(e) => setColorCount(Number(e.target.value))}
+          style={{ width: 120 }}
+        />
+        <span style={{ minWidth: 48, color: colorCount === 0 ? '#aaa' : '#2196f3', fontWeight: colorCount > 0 ? 600 : 400 }}>
+          {colorCount === 0 ? '关闭' : `${colorCount} 色`}
+        </span>
       </div>
 
       <div style={{ fontSize: 11, color: '#999' }}>

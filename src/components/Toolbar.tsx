@@ -3,6 +3,9 @@ import { useEditorStore } from '../store/editor';
 import type { Tool } from '../store/editor';
 import { MARD221 } from '../data/mard221';
 
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+const ZOOM_LABELS = ['50%', '75%', '100%', '150%', '200%', '300%', '400%'];
+
 interface ToolbarProps {
   onExport: () => void;
 }
@@ -14,6 +17,7 @@ const TOOLS: { id: Tool; label: string; icon: string }[] = [
   { id: 'eyedropper', label: '吸管', icon: '💧' },
   { id: 'magicWand', label: '魔棒', icon: '✨' },
   { id: 'rectSelect', label: '框选', icon: '▭' },
+  { id: 'pan', label: '拖动', icon: '✋' },
 ];
 
 const Toolbar: React.FC<ToolbarProps> = ({ onExport }) => {
@@ -29,6 +33,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ onExport }) => {
   const clearGrid = useEditorStore((s) => s.clearGrid);
   const startImport = useEditorStore((s) => s.startImport);
   const isImporting = useEditorStore((s) => s.isImporting);
+  const zoomIdx = useEditorStore((s) => s.zoomIdx);
+  const setZoomIdx = useEditorStore((s) => s.setZoomIdx);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,6 +160,25 @@ const Toolbar: React.FC<ToolbarProps> = ({ onExport }) => {
         >
           🗑️ 清空
         </button>
+      </div>
+
+      <div style={{ width: 1, height: 28, backgroundColor: '#e0e0e0' }} />
+
+      {/* 画布缩放 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button
+          onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))}
+          disabled={zoomIdx === 0}
+          style={{ ...iconBtnStyle, padding: '6px 8px', opacity: zoomIdx === 0 ? 0.4 : 1 }}
+        >－</button>
+        <span style={{ fontSize: 12, color: '#555', minWidth: 36, textAlign: 'center' }}>
+          {ZOOM_LABELS[zoomIdx]}
+        </span>
+        <button
+          onClick={() => setZoomIdx(Math.min(ZOOM_LEVELS.length - 1, zoomIdx + 1))}
+          disabled={zoomIdx === ZOOM_LEVELS.length - 1}
+          style={{ ...iconBtnStyle, padding: '6px 8px', opacity: zoomIdx === ZOOM_LEVELS.length - 1 ? 0.4 : 1 }}
+        >＋</button>
       </div>
 
       {/* 当前颜色指示 */}

@@ -5,6 +5,7 @@ import { magicWandSelect } from '../core/magicWand';
 
 const CELL_SIZE = 16;
 const CANVAS_SIZE = GRID_SIZE * CELL_SIZE;
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 const BeadCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,6 +13,10 @@ const BeadCanvas: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [hoverCell, setHoverCell] = useState<{ col: number; row: number } | null>(null);
+  const [panStart, setPanStart] = useState<{ x: number; y: number; scrollX: number; scrollY: number } | null>(null);
+
+  const zoomIdx = useEditorStore((s) => s.zoomIdx);
+  const zoom = ZOOM_LEVELS[zoomIdx];
 
   const grid = useEditorStore((s) => s.grid);
   const tool = useEditorStore((s) => s.tool);
@@ -57,8 +62,8 @@ const BeadCanvas: React.FC = () => {
     }
 
     // 细网格线（每格）
-    ctx.strokeStyle = '#e0e0e0';
-    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = '#b0b0b0';
+    ctx.lineWidth = 1;
     for (let i = 0; i <= GRID_SIZE; i++) {
       const pos = i * CELL_SIZE;
       ctx.beginPath();
@@ -207,10 +212,19 @@ const BeadCanvas: React.FC = () => {
           useEditorStore.getState().setTool('brush');
         }
       } else if (tool === 'magicWand') {
-        const selected = magicWandSelect(grid, cell.idx, { tolerance: 10 });
+        const selected = magicWandSelect(grid, cell.idx);
         setSelection(selected);
       } else if (tool === 'rectSelect') {
         setDragStart({ col: cell.col, row: cell.row });
+        setIsDragging(true);
+      } else if (tool === 'pan') {
+        const scrollEl = overlayRef.current?.closest('[data-scroll]') as HTMLElement | null;
+        setPanStart({
+          x: e.clientX,
+          y: e.clientY,
+          scrollX: scrollEl?.scrollLeft ?? 0,
+          scrollY: scrollEl?.scrollTop ?? 0,
+        });
         setIsDragging(true);
       }
     },
@@ -231,6 +245,12 @@ const BeadCanvas: React.FC = () => {
       } else if (tool === 'eraser') {
         const indices = getBrushIndices(cell.col, cell.row);
         setCells(indices, 0);
+      } else if (tool === 'pan' && panStart) {
+        const scrollEl = overlayRef.current?.closest('[data-scroll]') as HTMLElement | null;
+        if (scrollEl) {
+          scrollEl.scrollLeft = panStart.scrollX - (e.clientX - panStart.x);
+          scrollEl.scrollTop = panStart.scrollY - (e.clientY - panStart.y);
+        }
       } else if (tool === 'rectSelect' && dragStart) {
         const minCol = Math.min(dragStart.col, cell.col);
         const maxCol = Math.max(dragStart.col, cell.col);
@@ -245,12 +265,13 @@ const BeadCanvas: React.FC = () => {
         setSelection(selected);
       }
     },
-    [isDragging, tool, brushSize, currentColorIdx, dragStart, getCellFromEvent, getBrushIndices, setCells, setSelection],
+    [isDragging, tool, brushSize, currentColorIdx, dragStart, panStart, getCellFromEvent, getBrushIndices, setCells, setSelection],
   );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setDragStart(null);
+    setPanStart(null);
   }, []);
 
   // 键盘快捷键：Delete 删除选区
@@ -268,76 +289,76 @@ const BeadCanvas: React.FC = () => {
   }, [selection, pushHistory, deleteSelection]);
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* 主画布 */}
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        style={{ display: 'block', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-      />
-      {/* 虚线框覆盖层：接收所有鼠标事件 */}
-      <canvas
-        ref={overlayRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          pointerEvents: 'auto',
-          cursor:
-            tool === 'brush'
-              ? 'none'
-              : tool === 'eraser'
-              ? 'none'
-              : tool === 'eyedropper'
-              ? 'copy'
-              : tool === 'magicWand'
-              ? 'pointer'
-              : 'default',
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => { handleMouseUp(); setHoverCell(null); }}
-      />
-      {/* 选区操作提示 */}
-      {selection && selection.size > 0 && (
-        <div
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      {/* 画布区域 */}
+      <div style={{ position: 'relative' }}>
+        {/* 主画布 */}
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_SIZE}
+          height={CANVAS_SIZE}
+          style={{
+            display: 'block',
+            width: CANVAS_SIZE * zoom,
+            height: CANVAS_SIZE * zoom,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        />
+        {/* 虚线框覆盖层：接收所有鼠标事件 */}
+        <canvas
+          ref={overlayRef}
+          width={CANVAS_SIZE}
+          height={CANVAS_SIZE}
           style={{
             position: 'absolute',
-            bottom: -40,
+            top: 0,
             left: 0,
-            right: 0,
-            display: 'flex',
-            gap: 8,
-            justifyContent: 'center',
+            width: CANVAS_SIZE * zoom,
+            height: CANVAS_SIZE * zoom,
+            pointerEvents: 'auto',
+            cursor:
+              tool === 'brush'
+                ? 'none'
+                : tool === 'eraser'
+                ? 'none'
+                : tool === 'eyedropper'
+                ? 'copy'
+                : tool === 'magicWand'
+                ? 'pointer'
+                : tool === 'pan'
+                ? isDragging ? 'grabbing' : 'grab'
+                : 'default',
           }}
-        >
-          <button
-            onClick={() => {
-              pushHistory();
-              deleteSelection();
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => { handleMouseUp(); setHoverCell(null); }}
+        />
+        {/* 选区操作提示 */}
+        {selection && selection.size > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: -40,
+              left: 0,
+              right: 0,
+              display: 'flex',
+              gap: 8,
+              justifyContent: 'center',
             }}
-            style={btnStyle}
           >
-            删除选区
-          </button>
-          <button
-            onClick={() => {
-              pushHistory();
-              fillSelection(currentColorIdx);
-            }}
-            style={btnStyle}
-          >
-            填充当前色
-          </button>
-          <button onClick={() => setSelection(null)} style={btnStyle}>
-            取消选区
-          </button>
-        </div>
-      )}
+            <button onClick={() => { pushHistory(); deleteSelection(); }} style={btnStyle}>
+              删除选区
+            </button>
+            <button onClick={() => { pushHistory(); fillSelection(currentColorIdx); }} style={btnStyle}>
+              填充当前色
+            </button>
+            <button onClick={() => setSelection(null)} style={btnStyle}>
+              取消选区
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

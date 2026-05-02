@@ -7,7 +7,8 @@ export type Tool =
   | 'bucket'
   | 'eyedropper'
   | 'magicWand'
-  | 'rectSelect';
+  | 'rectSelect'
+  | 'pan';
 
 export const GRID_SIZE = 52;
 export const TOTAL_CELLS = GRID_SIZE * GRID_SIZE;
@@ -33,6 +34,10 @@ interface EditorState {
 
   // 历史
   history: HistoryStack;
+
+  // 画布缩放
+  zoomIdx: number;
+  setZoomIdx: (idx: number) => void;
 
   // Actions
   setTool: (tool: Tool) => void;
@@ -78,6 +83,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     tool: 'brush',
     brushSize: 1,
     currentColorIdx: 1,
+    zoomIdx: 2, // 默认 1x
     importImage: null,
     importScale: 1,
     importOffsetX: 0,
@@ -85,6 +91,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
     isImporting: false,
     selection: null,
     history,
+
+    setZoomIdx: (zoomIdx) => set({ zoomIdx }),
 
     setTool: (tool) => set({ tool, selection: null }),
     setBrushSize: (brushSize) => set({ brushSize }),
