@@ -79,23 +79,38 @@ const Toolbar: React.FC<ToolbarProps> = ({ onExport }) => {
       {/* 画笔大小 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 12, color: '#666' }}>画笔</span>
-        {[1, 3, 5].map((size) => (
-          <button
-            key={size}
-            onClick={() => setBrushSize(size as 1 | 3 | 5)}
-            style={{
-              width: 24,
-              height: 24,
-              border: '1px solid #ddd',
-              borderRadius: 4,
-              backgroundColor: brushSize === size ? '#e3f2fd' : '#fff',
-              cursor: 'pointer',
-              fontSize: 10,
-            }}
-          >
-            {size}×{size}
-          </button>
-        ))}
+        {([1, 3, 5] as const).map((size) => {
+          const dotSize = size === 1 ? 5 : size === 3 ? 9 : 13;
+          const isActive = brushSize === size;
+          return (
+            <button
+              key={size}
+              onClick={() => setBrushSize(size)}
+              title={`${size}×${size}`}
+              style={{
+                width: 32,
+                height: 32,
+                border: `1px solid ${isActive ? '#2196f3' : '#ddd'}`,
+                borderRadius: 6,
+                backgroundColor: isActive ? '#e3f2fd' : '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: '50%',
+                  backgroundColor: isActive ? '#2196f3' : '#555',
+                }}
+              />
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ width: 1, height: 28, backgroundColor: '#e0e0e0' }} />
