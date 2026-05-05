@@ -29,6 +29,22 @@ interface EditorState {
   importOffsetY: number;
   isImporting: boolean;
 
+  // 导入配置
+  importSizeMode: 'auto' | 'manual';
+  importTargetLongSide: number;
+  importManualWidth: number;
+  importManualHeight: number;
+  importKeepAspectRatio: boolean;
+  importInterpolation: 'bilinear' | 'nearest';
+  setImportConfig: (config: Partial<{
+    sizeMode: 'auto' | 'manual';
+    targetLongSide: number;
+    manualWidth: number;
+    manualHeight: number;
+    keepAspectRatio: boolean;
+    interpolation: 'bilinear' | 'nearest';
+  }>) => void;
+
   // 选区
   selection: Set<number> | null;
 
@@ -89,8 +105,25 @@ export const useEditorStore = create<EditorState>((set, get) => {
     importOffsetX: 0,
     importOffsetY: 0,
     isImporting: false,
+    importSizeMode: 'auto',
+    importTargetLongSide: 24,
+    importManualWidth: 24,
+    importManualHeight: 24,
+    importKeepAspectRatio: true,
+    importInterpolation: 'bilinear',
     selection: null,
     history,
+
+    setImportConfig: (config) => set((s) => {
+      const patch: Record<string, unknown> = {};
+      if (config.sizeMode !== undefined) patch.importSizeMode = config.sizeMode;
+      if (config.targetLongSide !== undefined) patch.importTargetLongSide = config.targetLongSide;
+      if (config.manualWidth !== undefined) patch.importManualWidth = config.manualWidth;
+      if (config.manualHeight !== undefined) patch.importManualHeight = config.manualHeight;
+      if (config.keepAspectRatio !== undefined) patch.importKeepAspectRatio = config.keepAspectRatio;
+      if (config.interpolation !== undefined) patch.importInterpolation = config.interpolation;
+      return patch;
+    }),
 
     setZoomIdx: (zoomIdx) => set({ zoomIdx }),
 
@@ -177,7 +210,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     startImport: (img) =>
       set({
         importImage: img,
-        importScale: Math.min(GRID_SIZE / img.naturalWidth, GRID_SIZE / img.naturalHeight),
+        importScale: 44 / GRID_SIZE,
         importOffsetX: 0,
         importOffsetY: 0,
         isImporting: true,

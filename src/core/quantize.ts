@@ -66,43 +66,57 @@ export function posterizeRGBA(data: Uint8ClampedArray, k: number): Uint8ClampedA
   return result;
 }
 
-export const GRID = 52;
+/**
+ * 根据目标长边 bead 数推荐 K-means 色数
+ * 小图用较少色，大图用较多色
+ */
+export function suggestKmeansK(targetLongSide: number): number {
+  if (targetLongSide <= 16) return 4;
+  if (targetLongSide <= 20) return 6;
+  if (targetLongSide <= 28) return 10;
+  if (targetLongSide <= 36) return 14;
+  return 20;
+}
 
 /**
  * 孤立像素清理：对量化后的网格做 N 遍"众数滤波"
  * 每一遍：凡是某格颜色在 8 邻域里同色数 ≤ minSame，就替换为邻域中出现最多的颜色
- * passes=1~3 足够清理大多数噪点；passes 越多颜色越"团块化"
+ * passes=1~3 足够清理大多数噪点
  */
-export function cleanIsolatedPixels(grid: Uint8Array, passes: number = 1): Uint8Array {
-  const G = 52;
+export function cleanIsolatedPixels(
+  grid: Uint8Array,
+  width: number,
+  height: number,
+  passes: number = 1,
+): Uint8Array {
   let cur = new Uint8Array(grid);
   for (let p = 0; p < passes; p++) {
     const next = new Uint8Array(cur);
-    for (let i = 0; i < G * G; i++) {
-      const myColor = cur[i];
-      if (myColor === 0) continue;
-      const col = i % G;
-      const row = Math.floor(i / G);
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        const i = row * width + col;
+        const myColor = cur[i];
+        if (myColor === 0) continue;
 
-      const counts = new Map<number, number>();
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nc = col + dx, nr = row + dy;
-          if (nc < 0 || nc >= G || nr < 0 || nr >= G) continue;
-          const c = cur[nr * G + nc];
-          if (c > 0) counts.set(c, (counts.get(c) || 0) + 1);
+        const counts = new Map<number, number>();
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nc = col + dx, nr = row + dy;
+            if (nc < 0 || nc >= width || nr < 0 || nr >= height) continue;
+            const c = cur[nr * width + nc];
+            if (c > 0) counts.set(c, (counts.get(c) || 0) + 1);
+          }
         }
-      }
 
-      const sameCount = counts.get(myColor) || 0;
-      // 如果这格颜色在邻域里只有 0 或 1 个同伴，则替换为邻域最多色
-      if (sameCount <= 1) {
-        let bestColor = myColor, bestCount = 0;
-        for (const [c, cnt] of counts) {
-          if (cnt > bestCount) { bestCount = cnt; bestColor = c; }
+        const sameCount = counts.get(myColor) || 0;
+        if (sameCount <= 1) {
+          let bestColor = myColor, bestCount = 0;
+          for (const [c, cnt] of counts) {
+            if (cnt > bestCount) { bestCount = cnt; bestColor = c; }
+          }
+          if (bestCount > sameCount) next[i] = bestColor;
         }
-        if (bestCount > sameCount) next[i] = bestColor;
       }
     }
     cur = next;
@@ -110,53 +124,55 @@ export function cleanIsolatedPixels(grid: Uint8Array, passes: number = 1): Uint8
   return cur;
 }
 
-// 把 HTMLImageElement 缩放到 52x52 并量化到 MARD 调色板
+// 把 HTMLImageElement 缩放到指定尺寸并量化到 MARD 调色板
 // fit: 'contain' (保持比例留空) 或 'cover' (填满，可能裁剪)
 export function quantizeImageToGrid(
   img: HTMLImageElement,
   options: {
+    width?: number;
+    height?: number;
     fit?: 'contain' | 'cover';
-    bgTransparent?: boolean;       // alpha=0 视为空
-    transparentThreshold?: number; // 透明度阈值 0~255
+    bgTransparent?: boolean;
+    transparentThreshold?: number;
   } = {},
 ): Uint8Array {
-  const { fit = 'contain', bgTransparent = true, transparentThreshold = 128 } = options;
+  const { width = 52, height = 52, fit = 'contain', bgTransparent = true, transparentThreshold = 128 } = options;
 
   const off = document.createElement('canvas');
-  off.width = GRID;
-  off.height = GRID;
+  off.width = width;
+  off.height = height;
   const ctx = off.getContext('2d')!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.clearRect(0, 0, GRID, GRID);
+  ctx.clearRect(0, 0, width, height);
 
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
-  let dx = 0, dy = 0, dw = GRID, dh = GRID;
+  let dx = 0, dy = 0, dw = width, dh = height;
   if (fit === 'contain') {
-    const r = Math.min(GRID / iw, GRID / ih);
+    const r = Math.min(width / iw, height / ih);
     dw = Math.round(iw * r);
     dh = Math.round(ih * r);
-    dx = Math.floor((GRID - dw) / 2);
-    dy = Math.floor((GRID - dh) / 2);
+    dx = Math.floor((width - dw) / 2);
+    dy = Math.floor((height - dh) / 2);
   } else {
-    const r = Math.max(GRID / iw, GRID / ih);
+    const r = Math.max(width / iw, height / ih);
     dw = Math.round(iw * r);
     dh = Math.round(ih * r);
-    dx = Math.floor((GRID - dw) / 2);
-    dy = Math.floor((GRID - dh) / 2);
+    dx = Math.floor((width - dw) / 2);
+    dy = Math.floor((height - dh) / 2);
   }
   ctx.drawImage(img, dx, dy, dw, dh);
 
-  const data = ctx.getImageData(0, 0, GRID, GRID).data;
-  const out = new Uint8Array(GRID * GRID);
-  for (let i = 0; i < GRID * GRID; i++) {
+  const data = ctx.getImageData(0, 0, width, height).data;
+  const out = new Uint8Array(width * height);
+  for (let i = 0; i < width * height; i++) {
     const r = data[i * 4];
     const g = data[i * 4 + 1];
     const b = data[i * 4 + 2];
     const a = data[i * 4 + 3];
     if (bgTransparent && a < transparentThreshold) {
-      out[i] = 0; // 空
+      out[i] = 0;
     } else {
       out[i] = nearestPaletteIndex(r, g, b);
     }
@@ -164,7 +180,7 @@ export function quantizeImageToGrid(
   return out;
 }
 
-// 直接对一段 RGBA imageData 数据量化（用于裁剪后已经是 52x52）
+// 直接对一段 RGBA imageData 数据量化
 export function quantizeRGBA(data: Uint8ClampedArray): Uint8Array {
   const n = data.length / 4;
   const out = new Uint8Array(n);
@@ -177,4 +193,30 @@ export function quantizeRGBA(data: Uint8ClampedArray): Uint8Array {
     }
   }
   return out;
+}
+
+/**
+ * 将小网格居中放置到大画布上（用于导入后自动居中）
+ * 返回大画布的 Uint8Array（画布尺寸 × 画布尺寸）
+ */
+export function centerGridOnCanvas(
+  smallGrid: Uint8Array,
+  smallW: number,
+  smallH: number,
+  canvasSize: number = 52,
+): Uint8Array {
+  const full = new Uint8Array(canvasSize * canvasSize);
+  const dx = Math.floor((canvasSize - smallW) / 2);
+  const dy = Math.floor((canvasSize - smallH) / 2);
+  for (let row = 0; row < smallH; row++) {
+    for (let col = 0; col < smallW; col++) {
+      const srcIdx = row * smallW + col;
+      const dstCol = dx + col;
+      const dstRow = dy + row;
+      if (dstRow >= 0 && dstRow < canvasSize && dstCol >= 0 && dstCol < canvasSize) {
+        full[dstRow * canvasSize + dstCol] = smallGrid[srcIdx];
+      }
+    }
+  }
+  return full;
 }

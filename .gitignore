@@ -28,6 +28,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude
+.claude/
+
 # Temp
 *.tmp
 *.temp
